@@ -102,6 +102,24 @@ class BundleTarTest {
     }
 
     @Test
+    fun `an app can widen the characters but never the structure of a path`() {
+        val wide = BundleTar.Limits(pathChars = BundleTar.PERMISSIVE_PATH_CHARS)
+        assertEquals(
+            mapOf("flutter assets/Icons #1.ttf" to 1),
+            readAll(bundle(Item("flutter assets/Icons #1.ttf", byteArrayOf(1))), wide).mapValues { it.value.size },
+        )
+        for (name in listOf("../escape", "a//b", "a/./b", "a/../b")) {
+            assertTrue(name, refused(bundle(Item(name, byteArrayOf(1))), wide).contains("bundle path"))
+        }
+        assertTrue(refused(bundle(Item("has space", byteArrayOf(1)))).contains("characters"))
+        try {
+            BundleTar.validatePath("tab\there", BundleTar.PERMISSIVE_PATH_CHARS)
+            fail("control characters are refused")
+        } catch (_: BundleTarException) {
+        }
+    }
+
+    @Test
     fun `a link is refused`() {
         val reason = refused(bundle(Item("link", type = TarConstants.LF_SYMLINK, link = "/etc/passwd")))
         assertTrue(reason, reason.contains("link"))

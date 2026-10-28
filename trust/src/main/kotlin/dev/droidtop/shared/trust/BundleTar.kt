@@ -34,6 +34,11 @@ object BundleTar {
         val maxEntries: Int = 20_000,
         /** The most memory the xz decoder may use, in KiB. */
         val xzMemoryKiB: Int = 512 * 1024,
+        /**
+         * The characters a path may be made of. The default is the strict set `A-Z a-z 0-9 . _ + @ - /`; an app
+         * whose bundles carry other file names (spaces, say) widens it, never past [PERMISSIVE_PATH_CHARS].
+         */
+        val pathChars: Regex = STRICT_PATH_CHARS,
     )
 
     /** One regular file of the archive. [input] is valid only inside the callback. */
@@ -88,14 +93,14 @@ object BundleTar {
         while (true) {
             val entry: TarArchiveEntry = tar.nextEntry ?: return
             if (entry.isDirectory) {
-                validatePath(entry.name.trimEnd('/'))
+                validatePath(entry.name.trimEnd('/'), limits.pathChars)
                 continue
             }
             if (++count > limits.maxEntries) throw BundleTarException("the bundle holds more than ${limits.maxEntries} files")
             // isFile alone is true for a symbolic link in some versions, so the kinds are named.
             val special = entry.isSymbolicLink || entry.isLink || entry.isCharacterDevice || entry.isBlockDevice || entry.isFIFO
             if (special || !entry.isFile) throw BundleTarException("${entry.name} is a link or a special file, which a bundle may not hold")
-            val path = validatePath(entry.name)
+            val path = validatePath(entry.name, limits.pathChars)
             if (entry.size > limits.maxEntryBytes) {
                 throw BundleTarException("$path is larger than the per-file cap of ${limits.maxEntryBytes} bytes")
             }
@@ -106,16 +111,19 @@ object BundleTar {
 
     /**
      * [path] with `\` read as `/`, or [BundleTarException]. A path is a relative `/`-separated name made of
-     * letters, digits and `. _ + @ -`, with no empty, `.` or `..` part: nothing that can leave the folder a
-     * bundle is extracted into.
+     * [chars] (by default letters, digits and `. _ + @ -`), with no empty, `.` or `..` part: nothing that can
+     * leave the folder a bundle is extracted into.
      */
-    fun validatePath(path: String): String {
+    fun validatePath(path: String, chars: Regex = STRICT_PATH_CHARS): String {
         val clean = path.replace('\\', '/')
         if (clean.isBlank() || clean.startsWith('/') || clean.endsWith('/')) throw BundleTarException("\"$path\" is not a bundle path")
         if (clean.split('/').any { it.isBlank() || it == "." || it == ".." }) throw BundleTarException("\"$path\" is not a safe bundle path")
-        if (!clean.matches(PATH_CHARS)) throw BundleTarException("\"$path\" has characters a bundle path may not have")
+        if (!clean.matches(chars)) throw BundleTarException("\"$path\" has characters a bundle path may not have")
         return clean
     }
 
-    private val PATH_CHARS = Regex("[A-Za-z0-9._+@/-]+")
+    val STRICT_PATH_CHARS = Regex("[A-Za-z0-9._+@/-]+")
+
+    /** Anything but control characters: the widest set a bundle path may use. `..`, empty and absolute parts are refused whatever the set. */
+    val PERMISSIVE_PATH_CHARS = Regex("[^\\u0000-\\u001f]+")
 }
