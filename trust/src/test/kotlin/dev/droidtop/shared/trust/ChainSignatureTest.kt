@@ -127,6 +127,15 @@ class ChainSignatureTest {
     }
 
     @Test
+    fun `ES256 signatures verify for every value shape`() {
+        // Many signatures have r and s with a high first bit or with leading zero bytes, which the DER conversion must get right.
+        repeat(64) { index ->
+            val content = "$index".toByteArray()
+            assertTrue(verify(TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, content), content = content) is ChainSignature.Result.Verified)
+        }
+    }
+
+    @Test
     fun `the typ binds the purpose`() {
         val jws = TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(leaf), leafKey.private, manifest)
         assertTrue(verify(jws) is ChainSignature.Result.Refused)
