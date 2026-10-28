@@ -64,16 +64,17 @@ object BundleTar {
     }
 
     /**
-     * Calls [onEntry] for each regular file of [archive], in archive order. An entry the callback
+     * Calls [onEntry] for each regular file of [archive], in archive order, and [onDirectory] (with its validated path)
+     * for each folder entry; a folder's name is held to the same rules as a file's. An entry the callback
      * does not read to the end is skipped. Throws [BundleTarException] for an archive that is
      * refused or cannot be read; an exception from [onEntry] passes through unchanged.
      */
-    fun read(archive: File, limits: Limits = Limits(), onEntry: (Entry) -> Unit) {
+    fun read(archive: File, limits: Limits = Limits(), onDirectory: (String) -> Unit = {}, onEntry: (Entry) -> Unit) {
         try {
             archive.inputStream().buffered().use { compressed ->
                 @Suppress("DEPRECATION")
                 XZCompressorInputStream(compressed, false, limits.xzMemoryKiB).use { xz ->
-                    TarArchiveInputStream(BufferedInputStream(xz)).use { tar -> readEntries(tar, limits, onEntry) }
+                    TarArchiveInputStream(BufferedInputStream(xz)).use { tar -> readEntries(tar, limits, onDirectory, onEntry) }
                 }
             }
         } catch (e: BundleTarException) {
@@ -87,13 +88,13 @@ object BundleTar {
         }
     }
 
-    private fun readEntries(tar: TarArchiveInputStream, limits: Limits, onEntry: (Entry) -> Unit) {
+    private fun readEntries(tar: TarArchiveInputStream, limits: Limits, onDirectory: (String) -> Unit, onEntry: (Entry) -> Unit) {
         val seen = HashSet<String>()
         var count = 0
         while (true) {
             val entry: TarArchiveEntry = tar.nextEntry ?: return
             if (entry.isDirectory) {
-                validatePath(entry.name.trimEnd('/'), limits.pathChars)
+                onDirectory(validatePath(entry.name.trimEnd('/'), limits.pathChars))
                 continue
             }
             if (++count > limits.maxEntries) throw BundleTarException("the bundle holds more than ${limits.maxEntries} files")

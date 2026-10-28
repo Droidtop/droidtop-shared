@@ -75,9 +75,20 @@ class BundleTarTest {
     }
 
     @Test
-    fun `directories are allowed and not reported`() {
+    fun `directories are allowed and reported apart from files`() {
         val archive = bundle(Item("bin/", type = TarConstants.LF_DIR), Item("bin/run", byteArrayOf(9)))
         assertEquals(listOf("bin/run"), readAll(archive).keys.toList())
+        val folders = mutableListOf<String>()
+        BundleTar.read(archive, onDirectory = { folders += it }) {}
+        assertEquals(listOf("bin"), folders)
+        // A folder's name is held to the same rules as a file's.
+        val reason = try {
+            BundleTar.read(bundle(Item("../up/", type = TarConstants.LF_DIR)), onDirectory = {}) {}
+            ""
+        } catch (e: BundleTarException) {
+            e.message.orEmpty()
+        }
+        assertTrue(reason, reason.contains("bundle path"))
     }
 
     @Test
