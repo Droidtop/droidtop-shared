@@ -91,6 +91,42 @@ class ChainSignatureTest {
     }
 
     @Test
+    fun `a certificate with a critical extension nobody understands is refused`() {
+        val critical = TestPki.cert("critical", leafKey.public).eku(TestPki.PLUGIN).uri("urn:droidtop:origin:droidtop")
+            .criticalExtension("1.2.3.4.5").issuedBy(core, coreKey.private).build()
+        val result = verify(TestPki.detached(pluginTyp, listOf(critical), leafKey.private, manifest))
+        assertTrue(refusedFor(result), refusedFor(result).contains("critical extensions"))
+        // An intermediate is held to it as well.
+        val orgKey = TestPki.rsa()
+        val org = TestPki.cert("org", orgKey.public).ca(1).criticalExtension("1.2.3.4.5").selfSigned(orgKey.private).build()
+        val repoKey = TestPki.ec()
+        val repo = TestPki.pluginLeaf(repoKey, "acme", org, orgKey.private)
+        assertTrue(verify(TestPki.detached(pluginTyp, listOf(repo, org), repoKey.private, manifest), on = ChainSignature.Anchor(orgKey.public)) is ChainSignature.Result.Refused)
+    }
+
+    @Test
+    fun `a chain is verified without a signature, and a revoked anchor key refuses it`() {
+        assertEquals(null, ChainSignature.verifyChain(listOf(leaf), ChainSignature.Purpose.PLUGIN, anchor))
+        assertTrue(ChainSignature.verifyChain(listOf(leaf), ChainSignature.Purpose.CATALOG, anchor) != null)
+        assertTrue(ChainSignature.verifyChain(emptyList(), ChainSignature.Purpose.PLUGIN, anchor) != null)
+        assertTrue(ChainSignature.verifyChain(listOf(leaf, leaf, leaf, leaf), ChainSignature.Purpose.PLUGIN, anchor)!!.contains("1 to 3"))
+        val byLeaf = ChainSignature.verifyChain(listOf(leaf), ChainSignature.Purpose.PLUGIN, anchor, revoked = { it == leaf })
+        assertTrue(byLeaf!!, byLeaf.contains("revoked"))
+        assertTrue(ChainSignature.verifyChain(listOf(leaf), ChainSignature.Purpose.PLUGIN, anchor, anchorRevoked = true)!!.contains("revoked"))
+        val jws = TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, manifest)
+        assertTrue(ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifest, anchorRevoked = true) is ChainSignature.Result.Refused)
+    }
+
+    @Test
+    fun `the key a signature claims is readable without trusting it`() {
+        val jws = TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, manifest)
+        assertEquals(Sha256.hex(leaf.publicKey.encoded), ChainSignature.claimedLeafKeySha256(jws))
+        for (bad in listOf("", "a.b.c", "x", TestPki.header(pluginTyp, emptyList(), leafKey.private) + "..AAAA")) {
+            assertNull(bad, ChainSignature.claimedLeafKeySha256(bad))
+        }
+    }
+
+    @Test
     fun `the typ binds the purpose`() {
         val jws = TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(leaf), leafKey.private, manifest)
         assertTrue(verify(jws) is ChainSignature.Result.Refused)

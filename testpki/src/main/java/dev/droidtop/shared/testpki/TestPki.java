@@ -79,6 +79,7 @@ public final class TestPki {
         private boolean noKeyUsage;
         private final List<String> ekus = new ArrayList<>();
         private final List<String> uris = new ArrayList<>();
+        private final List<String> criticalExtensions = new ArrayList<>();
         private Date notBefore = new Date(System.currentTimeMillis() - 365L * 86_400_000L);
         private Date notAfter = new Date(System.currentTimeMillis() + 3650L * 86_400_000L);
 
@@ -133,6 +134,12 @@ public final class TestPki {
             return this;
         }
 
+        /** Adds an extension of this OID, marked critical, that no verifier understands. */
+        public Cert criticalExtension(String oid) {
+            criticalExtensions.add(oid);
+            return this;
+        }
+
         public Cert valid(Date from, Date to) {
             this.notBefore = from;
             this.notAfter = to;
@@ -156,6 +163,9 @@ public final class TestPki {
                 if (!uris.isEmpty()) {
                     GeneralName[] names = uris.stream().map(u -> new GeneralName(GeneralName.uniformResourceIdentifier, u)).toArray(GeneralName[]::new);
                     builder.addExtension(Extension.subjectAlternativeName, false, new GeneralNames(names));
+                }
+                for (String oid : criticalExtensions) {
+                    builder.addExtension(new ASN1ObjectIdentifier(oid), true, new org.bouncycastle.asn1.DEROctetString(new byte[] {5, 0}));
                 }
                 String algorithm = issuerKey instanceof ECPrivateKey ? "SHA256withECDSA" : "SHA256withRSA";
                 return new JcaX509CertificateConverter().getCertificate(builder.build(new JcaContentSignerBuilder(algorithm).build(issuerKey)));

@@ -66,6 +66,18 @@ object ChainSignature {
         data class Refused(val reason: String) : Result
     }
 
+    /**
+     * Extensions this verifier reads. A certificate marking any other one critical is refused, as PKIX
+     * requires of an extension a verifier does not process.
+     */
+    private val UNDERSTOOD_CRITICAL = setOf(
+        "2.5.29.15", // keyUsage
+        "2.5.29.17", // subjectAltName
+        "2.5.29.19", // basicConstraints
+        "2.5.29.32", // certificatePolicies (informational)
+        "2.5.29.37", // extendedKeyUsage
+    )
+
     private const val MAX_CHARS = 64 * 1024
     private const val MAX_CHAIN = 3
     private const val MIN_RSA_BITS = 2048
@@ -93,6 +105,7 @@ object ChainSignature {
         anchor: Anchor,
         detached: ByteArray?,
         revoked: (X509Certificate) -> Boolean = { false },
+        anchorRevoked: Boolean = false,
     ): Result {
         val text = jws.trim()
         if (text.length > MAX_CHARS) return Result.Refused("the signature is too large")
@@ -121,12 +134,44 @@ object ChainSignature {
         val signature = runCatching { b64url(parts[2]) }.getOrNull() ?: return Result.Refused("the signature value is unreadable")
 
         chainProblem(chain, purpose, anchor)?.let { return Result.Refused(it) }
-        if (chain.any(revoked)) return Result.Refused("a certificate in the signature's chain has been revoked")
+        revocationProblem(chain, revoked, anchorRevoked)?.let { return Result.Refused(it) }
         if (!verifySignature(alg, chain.first().publicKey, signingInput, signature)) {
             return Result.Refused("the signature does not verify against its signing certificate")
         }
         return Result.Verified(chain, anchor, payload)
     }
+
+    /**
+     * Checks [chain] (leaf first, the anchor excluded) for [purpose] up to [anchor] and no further: everything [verify]
+     * checks without a signature around it, revocation included. An origin's published certificate is checked this way.
+     * Null when the chain is good, otherwise why not.
+     */
+    fun verifyChain(
+        chain: List<X509Certificate>,
+        purpose: Purpose,
+        anchor: Anchor,
+        revoked: (X509Certificate) -> Boolean = { false },
+        anchorRevoked: Boolean = false,
+    ): String? {
+        if (chain.isEmpty() || chain.size > MAX_CHAIN) return "the certificate chain must hold 1 to $MAX_CHAIN certificates"
+        return chainProblem(chain, purpose, anchor) ?: revocationProblem(chain, revoked, anchorRevoked)
+    }
+
+    private fun revocationProblem(chain: List<X509Certificate>, revoked: (X509Certificate) -> Boolean, anchorRevoked: Boolean): String? = when {
+        chain.any(revoked) -> "a certificate in the signature's chain has been revoked"
+        anchorRevoked -> "the key the chain ends at has been revoked"
+        else -> null
+    }
+
+    /**
+     * The SHA-256 of the key the leaf certificate of [jws] names, read without verifying anything: only for telling a person
+     * which key a refused signature claims, never for trusting it. Null when the header or its first certificate cannot be read.
+     */
+    fun claimedLeafKeySha256(jws: String): String? = runCatching {
+        val header = json.parseToJsonElement(String(b64url(jws.trim().substringBefore('.')), Charsets.UTF_8)).jsonObject
+        val first = ((header["x5c"] as? JsonArray)?.firstOrNull() as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+        Sha256.hex(parseCertificate(first)?.publicKey?.encoded ?: return null)
+    }.getOrNull()
 
     /** Why [chain] does not lead from a [purpose] leaf to [anchor], or null when it does. */
     private fun chainProblem(chain: List<X509Certificate>, purpose: Purpose, anchor: Anchor): String? {
@@ -134,6 +179,8 @@ object ChainSignature {
             if (cert.version != 3) return "a certificate in the chain is not X.509 v3"
             if (cert.sigAlgOID !in CERT_SIG_ALGS) return "a certificate in the chain uses a signature algorithm droidtop does not accept"
             if (!acceptableKey(cert.publicKey)) return "a certificate in the chain holds a key that is not P-256 or RSA of at least $MIN_RSA_BITS bits"
+            val unknown = cert.criticalExtensionOIDs.orEmpty() - UNDERSTOOD_CRITICAL
+            if (unknown.isNotEmpty()) return "a certificate in the chain has critical extensions this verifier does not understand ($unknown)"
         }
         val leaf = chain.first()
         if (leaf.basicConstraints != -1) return "the signing certificate is a CA certificate"
