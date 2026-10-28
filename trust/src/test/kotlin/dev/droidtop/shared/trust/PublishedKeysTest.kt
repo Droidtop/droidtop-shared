@@ -104,7 +104,9 @@ class PublishedKeysTest {
         assertTrue(PublishedKeys.originProblem("", reserved)!!.contains("blank"))
         assertTrue(PublishedKeys.originProblem("Acme", reserved)!!.contains("lowercase"))
         assertTrue(PublishedKeys.originProblem("a.b", reserved)!!.contains("lowercase"))
-        assertTrue(PublishedKeys.originProblem("a".repeat(41), reserved)!!.contains("at most"))
+        assertEquals(null, PublishedKeys.originProblem("a".repeat(64), reserved))
+        assertTrue(PublishedKeys.originProblem("a".repeat(65), reserved)!!.contains("at most 64"))
+        assertTrue(PublishedKeys.originProblem("a".repeat(41), reserved, maxLength = 40)!!.contains("at most 40"))
     }
 
     @Test

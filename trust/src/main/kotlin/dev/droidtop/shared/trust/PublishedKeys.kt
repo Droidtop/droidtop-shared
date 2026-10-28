@@ -22,7 +22,6 @@ object PublishedKeys {
         data class Failed(val reason: String) : Selection
     }
 
-    private const val MAX_ORIGIN_ID_LEN = 40
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
@@ -94,18 +93,18 @@ object PublishedKeys {
 
     /**
      * Why an origin id can't be trusted, or null when it can. Lowercase letters, digits and
-     * hyphens only (the id prefixes every plugin id, `<origin>.<name>`), at most 40 characters,
+     * hyphens only (the id prefixes every plugin id, `<origin>.<name>`), at most [maxLength] characters,
      * and never one of [reserved]: the ids the app itself certifies, which a third party may not
      * claim.
      */
-    fun originProblem(origin: String, reserved: Set<String>): String? {
+    fun originProblem(origin: String, reserved: Set<String>, maxLength: Int = 64): String? {
         val id = origin.trim()
         if (id.isEmpty()) return "origin id can't be blank"
         if (id in reserved) return "the origin id \"$id\" is official -- a third-party origin can't claim it"
         if (!id.matches(Regex("[a-z0-9-]+"))) {
             return "origin id must be lowercase letters, digits and hyphens (it prefixes every plugin id, \"<origin>.<name>\")"
         }
-        if (id.length > MAX_ORIGIN_ID_LEN) return "origin id must be at most $MAX_ORIGIN_ID_LEN characters"
+        if (id.length > maxLength) return "origin id must be at most $maxLength characters"
         return null
     }
 
@@ -119,6 +118,7 @@ object PublishedKeys {
         sourceUrl: String,
         fileNames: List<String>,
         reserved: Set<String>,
+        maxOriginLength: Int = 64,
         get: (String) -> ByteArray?,
     ): Selection {
         val candidates = fileNames.flatMap { keyUrlsFor(sourceUrl, it) }.distinct()
@@ -144,7 +144,7 @@ object PublishedKeys {
                 lastProblem = "the certificate $url publishes is not one that can be used for that origin"
                 continue
             }
-            originProblem(published.origin, reserved)?.let {
+            originProblem(published.origin, reserved, maxOriginLength)?.let {
                 return Selection.Failed("Origin \"${published.origin}\" can't be trusted: $it.")
             }
             return Selection.Fetched(published)
