@@ -23,3 +23,12 @@ no official key appears in the repository.
   over a size cap, too many entries, and an xz stream that asks for more memory than a limit.
   What an entry means (manifest, signature, payload) and the order it must come in stay with the
   app; the manifest formats differ on purpose.
+
+- `PublishedKeys`: finding and reading the key a plugin source publishes for itself: the address
+  its key file lives at (`keyUrlsFor`; plaintext http refused), reading the file (`parse`), the
+  anchor key from a certificate or bare public key (`anchorKey`), the origin ids a third party
+  may hold (`originProblem`), and `select`, which runs all of it over bytes the app fetched. The
+  library never fetches; the app's own HTTP client does.
+- `KeyRotation.decide` (a key offered for an origin is new, unchanged, a rotation by a higher
+  serial, or refused) and `Origins.normalizeGithub`.
+

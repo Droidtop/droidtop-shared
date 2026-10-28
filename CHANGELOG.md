@@ -12,3 +12,8 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
   with droidtop's tests ported onto a test-only `:testpki`. Droidtop/tracker#191.
 - `:trust` `BundleTar`: streaming reader for tar.xz bundles with path, link, duplicate, size,
   count and memory refusals. Droidtop/tracker#191.
+- `:trust` `PublishedKeys` (key-file addresses, reading a published key, anchor keys, third-party
+  origin ids, and `select` over fetched bytes), `KeyRotation` and `Origins.normalizeGithub`, from
+  droidtop's `PluginSourceKeys` and `UserOriginKeys` and Enginehost's `OfficialKeyRotation`.
+  Droidtop/tracker#191.
+
