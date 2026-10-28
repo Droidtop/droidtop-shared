@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 
 include(":version")
+include(":trust")
+include(":testpki")

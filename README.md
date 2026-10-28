@@ -10,6 +10,8 @@ API. Its tests run on a build machine with no device and no SDK.
 | Module | Owns |
 |---|---|
 | [`:version`](version/README.md) | Version parsing and ordering: strict dotted versions with a build counter, and loose ordering of free-form strings |
+| [`:trust`](trust/README.md) | Checking signatures: the certificate-chain JWS both apps use, and SHA-256 helpers. Pins no key |
+| `:testpki` | Test-only: throwaway certificate chains and signatures for the tests |
 
 Licence: GPL-3.0 (see `LICENSE`).
 

@@ -8,3 +8,5 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
 ### Added
 - `:version`: `Version`, `VersionSeries` and `VersionConstraint` (from Enginehost, with their
   tests), and `Versions.compareLoose` (from droidtop, with its tests). Droidtop/tracker#191.
+- `:trust`: `ChainSignature` (the certificate-chain JWS verifier, from droidtop) and `Sha256`,
+  with droidtop's tests ported onto a test-only `:testpki`. Droidtop/tracker#191.
