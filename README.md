@@ -11,6 +11,7 @@ API. Its tests run on a build machine with no device and no SDK.
 |---|---|
 | [`:version`](version/README.md) | Version parsing and ordering: strict dotted versions with a build counter, and loose ordering of free-form strings |
 | [`:net`](net/README.md) | One GitHub client for both apps: which requests may carry a token and redirects decided per hop, conditional release listings with pagination and rate-limit errors, bounded downloads |
+| [`:report`](report/README.md) | A bug reporter that needs no permission: one report model the person previews and edits, a redactor, and senders (Bugzilla REST, GitHub/Gitea issue form, email). No key ships in an app |
 | [`:trust`](trust/README.md) | Checking signatures: the certificate-chain JWS both apps use, and SHA-256 helpers. Pins no key |
 | `:testpki` | Test-only: throwaway certificate chains and signatures for the tests |
 

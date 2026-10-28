@@ -15,5 +15,6 @@ dependencyResolutionManagement {
 
 include(":version")
 include(":net")
+include(":report")
 include(":trust")
 include(":testpki")

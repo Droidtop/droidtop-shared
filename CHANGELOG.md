@@ -6,6 +6,9 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
 ## [Unreleased]
 
 ### Added
+- `:report`: `ReportDraft`/`Section`, `ReportComposer`, `Redactor` (from Enginehost's `scrub`; a folder
+  name with spaces no longer leaks past the first space), and `ReportSender` with `BugzillaSender`,
+  `IssueFormSender` and `EmailSender`. Droidtop/tracker#655.
 - `:net`: `GitHubAuth` (token hosts matched exactly, redirects followed by hand with the header decided
   per hop), `GitHubClient` (`get`, `listReleases`, `download`), `GitHubHttpException` and
   `GitHubReleases`, lifted from droidtop's `GitHubAuth`/`Http` and Enginehost's `PluginCatalog`.
