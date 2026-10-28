@@ -17,3 +17,9 @@ Uses `java.security` and `kotlinx-serialization-json` (to read the JWS header). 
 
 Tests build their keys and chains in the test run with `:testpki` (BouncyCastle, test-only);
 no official key appears in the repository.
+
+- `BundleTar`: reads a bundle (tar inside xz) as a stream of regular files, refusing a path that
+  could leave the folder it is extracted into, links and special files, a repeated path, an entry
+  over a size cap, too many entries, and an xz stream that asks for more memory than a limit.
+  What an entry means (manifest, signature, payload) and the order it must come in stay with the
+  app; the manifest formats differ on purpose.
