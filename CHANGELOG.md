@@ -6,6 +6,12 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
 ## [Unreleased]
 
 ### Added
+- `:net`: `GitHubAuth` (token hosts matched exactly, redirects followed by hand with the header decided
+  per hop), `GitHubClient` (`get`, `listReleases`, `download`), `GitHubHttpException` and
+  `GitHubReleases`, lifted from droidtop's `GitHubAuth`/`Http` and Enginehost's `PluginCatalog`.
+  Where the two disagreed on the token hosts, droidtop's three exact hosts win: Enginehost also
+  sent the token to `objects.githubusercontent.com` and to subdomains of the three.
+  Droidtop/tracker#194.
 - `:version`: `Version`, `VersionSeries` and `VersionConstraint` (from Enginehost, with their
   tests), and `Versions.compareLoose` (from droidtop, with its tests). Droidtop/tracker#191.
 - `:trust`: `ChainSignature` (the certificate-chain JWS verifier, from droidtop) and `Sha256`,
