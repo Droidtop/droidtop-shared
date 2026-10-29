@@ -1,5 +1,6 @@
 package dev.droidtop.shared.launchcontract
 
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -39,7 +40,7 @@ object EnginehostConfig {
     fun problems(text: String, requireVersion: Boolean = true): List<String> {
         val element: JsonElement = try {
             Json.parseToJsonElement(text)
-        } catch (e: Exception) {
+        } catch (e: SerializationException) {
             return listOf("not JSON")
         }
         val json: JsonObject = try {

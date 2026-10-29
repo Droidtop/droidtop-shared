@@ -40,11 +40,10 @@ sealed interface ReleaseListing {
 
 /** Reading GitHub's `releases` JSON and its `Link` header. */
 object GitHubReleases {
-    private val json = Json
 
     /** The releases in [body] (an array as `GET /repos/{owner}/{repo}/releases` returns), in the order given. Throws when it is not one. */
     fun parse(body: String): List<Release> {
-        val array: JsonArray = json.parseToJsonElement(body).jsonArray
+        val array: JsonArray = Json.parseToJsonElement(body).jsonArray
         return array.map { element ->
             val release = element.jsonObject
             Release(
