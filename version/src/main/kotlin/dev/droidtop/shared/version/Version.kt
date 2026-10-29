@@ -42,19 +42,23 @@ data class Version(val parts: List<Int>, val build: Int? = null) : Comparable<Ve
     fun belongsTo(series: VersionSeries): Boolean =
         parts.size >= series.parts.size && parts.take(series.parts.size) == series.parts
 
-    /** A stable weighted span used only to rank explicitly declared ranges. */
+    /**
+     * A stable weighted span used only to rank explicitly declared ranges: the first three parts count, a
+     * major step as 1,000,000, a minor as 1,000 and a patch as 1, so a minor difference of more than 1,000 outweighs
+     * a major one. Parts after the third and the [build] add nothing.
+     */
     fun distanceTo(other: Version): Long {
-        val len = maxOf(parts.size, other.parts.size)
         var distance = 0L
-        for (i in 0 until len) {
-            val diff = kotlin.math.abs(parts.getOrElse(i) { 0 } - other.parts.getOrElse(i) { 0 })
-            val weight = 1_000_000L / Math.pow(1000.0, i.toDouble()).toLong().coerceAtLeast(1)
-            distance += diff * weight
+        for ((i, weight) in DISTANCE_WEIGHTS.withIndex()) {
+            distance += kotlin.math.abs(parts.getOrElse(i) { 0 } - other.parts.getOrElse(i) { 0 }) * weight
         }
         return distance
     }
 
     companion object {
+        private val DISTANCE_WEIGHTS = longArrayOf(1_000_000L, 1_000L, 1L)
+        private val SYNTAX = Regex("[0-9]+(?:\\.[0-9]+)*(?:-[0-9]+)?")
+
         /** A plugin bundle version: [parse], with a legacy `X.Y.<run>` read as `X.Y.0-<run>`. */
         fun parsePlugin(raw: String): Version {
             val v = parse(raw)
@@ -64,7 +68,7 @@ data class Version(val parts: List<Int>, val build: Int? = null) : Comparable<Ve
 
         fun parse(raw: String): Version {
             val normalized = raw.trim()
-            require(normalized.matches(Regex("[0-9]+(?:\\.[0-9]+)*(?:-[0-9]+)?"))) {
+            require(SYNTAX.matches(normalized)) {
                 "Version must be dot-separated non-negative integers with an optional -build: $raw"
             }
             val dash = normalized.indexOf('-')

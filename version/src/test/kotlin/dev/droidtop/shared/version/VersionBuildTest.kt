@@ -85,4 +85,11 @@ class VersionBuildTest {
         assertTrue(builds.matches(v("1.0.0-5")))
         assertFalse(builds.matches(v("1.0.0-10")))
     }
+
+    @Test
+    fun distanceCountsThreeParts() {
+        assertEquals(1_002_003L, v("1.2.3").distanceTo(v("2.0.0")))
+        assertEquals("parts after the third and the build add nothing", 0L, v("1.2.3.9-4").distanceTo(v("1.2.3.0")))
+        assertEquals(v("1.0").distanceTo(v("1.0.0")), 0L)
+    }
 }
