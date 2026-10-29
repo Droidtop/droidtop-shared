@@ -13,7 +13,7 @@ no Android API, and nothing in it stores a token.
 - `GitHubClient`: `get` (a JSON request, conditional with `If-None-Match`, null for a 304, bounded
   body), `listReleases` (pages by `Link`, ETag on the first page, drafts included), and `download`
   (to an `OutputStream`, bounded, identity encoding and no cache, progress callback). Each app gives
-  its own `userAgent` and a `token` supplier.
+  its own `userAgent` and a `token` supplier, and may pass `onResponse` to log each answer (address, status, allowance left).
 - `GitHubHttpException`: a non-success status with `X-RateLimit-Remaining` and `X-RateLimit-Reset`,
   which is what tells "asked too often" from "will not answer you".
 - `GitHubReleases`: reading the `releases` JSON (`Release`, `ReleaseAsset`) and the `Link` header.

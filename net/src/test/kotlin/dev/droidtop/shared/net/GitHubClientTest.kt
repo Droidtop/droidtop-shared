@@ -234,6 +234,23 @@ class GitHubClientTest {
         assertNull(GitHubReleases.nextLink(null))
     }
 
+    @Test fun `every answer is reported with the allowance left and never with a header`() {
+        val api = serve { it.reply(200, "[]", "X-RateLimit-Remaining" to "41") }
+        val told = mutableListOf<Triple<String, Int, String?>>()
+        val client = GitHubClient("test/1", { "secret" }, loopback, onResponse = { url, status, left -> told += Triple(url, status, left) })
+        client.get("${api.base}/repos/o/r/releases?per_page=100")
+        assertEquals(listOf(Triple("${api.base}/repos/o/r/releases", 200, "41")), told)
+        assertTrue(told.none { it.toString().contains("secret") })
+    }
+
+    @Test fun `a refusal is reported too`() {
+        val api = serve { it.reply(403, "{}", "X-RateLimit-Remaining" to "0") }
+        val told = mutableListOf<Int>()
+        val client = GitHubClient("test/1", { null }, loopback, onResponse = { _, status, _ -> told += status })
+        try { client.get("${api.base}/x"); fail("403 accepted") } catch (e: GitHubHttpException) { }
+        assertEquals(listOf(403), told)
+    }
+
     @Test fun `a token is masked to its last four characters`() {
         assertEquals("****wxyz", GitHubAuth.masked("ghp_abcdwxyz"))
         assertEquals("****", GitHubAuth.masked("abc"))

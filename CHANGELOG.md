@@ -6,6 +6,8 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
 ## [Unreleased]
 
 ### Added
+- `:net` `GitHubClient(onResponse = ...)`: told of each answer's address, status and `X-RateLimit-Remaining`, for an
+  app's own log (Enginehost's one line per request, Droidtop/tracker#550, #195).
 - `:launch-contract`: `EnginehostIntents` (actions, extras, reasons, the capabilities provider) and
   `EnginehostConfig` (the `enginehost.json` keys and `problems`, a shape check), every string as released builds
   send it. Droidtop/tracker#204.

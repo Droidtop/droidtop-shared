@@ -19,6 +19,12 @@ class GitHubClient(
     private val apiBase: String = "https://api.github.com",
     private val apiTimeouts: Timeouts = Timeouts(15_000, 30_000),
     private val downloadTimeouts: Timeouts = Timeouts(20_000, 120_000),
+    /**
+     * Told of every answer: the address (query cut), the status, and `X-RateLimit-Remaining` when GitHub sent it. An app logs
+     * from here, so a refresh that runs dry says so in its own log as well as on screen (Droidtop/tracker#550). Never given
+     * a header or the token.
+     */
+    private val onResponse: (url: String, status: Int, rateLimitRemaining: String?) -> Unit = { _, _, _ -> },
 ) {
     data class Timeouts(val connectMs: Int, val readMs: Int)
 
@@ -44,6 +50,7 @@ class GitHubClient(
         val connection = auth.open(url, token(), apiTimeouts.connectMs, apiTimeouts.readMs, headers)
         try {
             val status = connection.responseCode
+            onResponse(url.substringBefore('?'), status, connection.getHeaderField("X-RateLimit-Remaining"))
             if (status == 304) return null
             if (status !in 200..299) throw failure(connection.getHeaderField("X-RateLimit-Remaining"), connection.getHeaderField("X-RateLimit-Reset"), status)
             if (connection.contentLengthLong > maxBytes) throw TooLarge(maxBytes)
@@ -94,6 +101,7 @@ class GitHubClient(
         val connection = auth.open(url, token(), downloadTimeouts.connectMs, downloadTimeouts.readMs, headers)
         try {
             val status = connection.responseCode
+            onResponse(url.substringBefore('?'), status, connection.getHeaderField("X-RateLimit-Remaining"))
             if (status !in 200..299) throw failure(connection.getHeaderField("X-RateLimit-Remaining"), connection.getHeaderField("X-RateLimit-Reset"), status)
             val total = connection.contentLengthLong
             if (total > maxBytes) throw TooLarge(maxBytes)
