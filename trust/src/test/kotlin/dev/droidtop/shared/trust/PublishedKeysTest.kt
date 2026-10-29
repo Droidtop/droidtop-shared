@@ -142,7 +142,18 @@ class PublishedKeysTest {
         val unusable = PublishedKeys.select("https://example.com/plugins", listOf(file), reserved) {
             keyJson("acme", "not a real spki key").toByteArray()
         }
-        assertTrue((unusable as PublishedKeys.Selection.Failed).reason.contains("can be used"))
+        assertTrue((unusable as PublishedKeys.Selection.Failed).reason.contains("cannot be used"))
+    }
+
+    @Test
+    fun `a certificate for another origin is refused with that reason, not a generic one`() {
+        val pair = freshKeyPair()
+        val named = TestPki.cert("acme", pair.public).eku(TestPki.PLUGIN).uri(ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+        val reason = (PublishedKeys.select("https://example.com/plugins", listOf(file), reserved) {
+            keyJson("someone-else", TestPki.pem(named)).toByteArray()
+        } as PublishedKeys.Selection.Failed).reason
+        assertTrue(reason, reason.contains("names other origins"))
+        assertNull(PublishedKeys.parse(keyJson("someone-else", TestPki.pem(named))))
     }
 
     @Test

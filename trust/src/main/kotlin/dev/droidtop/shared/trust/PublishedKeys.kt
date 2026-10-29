@@ -23,6 +23,7 @@ object PublishedKeys {
     }
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val ORIGIN_ID = Regex("[a-z0-9-]+")
 
     /**
      * The https URLs a source's key can live at, tried in order. A github.com repo address becomes
@@ -58,18 +59,34 @@ object PublishedKeys {
         return listOf("https://$body/$fileName")
     }
 
+    /** What [read] made of a published key text. */
+    private sealed interface Reading {
+        class Key(val published: Published) : Reading
+        /** Not a key file at all: no origin, or no key field. */
+        data object NoFields : Reading
+        /** A key file whose key cannot anchor [origin]; [problem] says why. */
+        class Unusable(val problem: String) : Reading
+    }
+
+    /** The key [read]ing found, with the reason when its text is there but cannot be used. */
+    private class Anchored(val key: String?, val problem: String)
+
     /**
      * Reads a published key file or catalog index: a JSON object with `origin` and one of
      * `certificate` (PEM or base64 DER), `key` or `publicKey` (a bare SubjectPublicKeyInfo), which
      * is the entire documented contract, so anything else is "doesn't publish a key", not a
-     * versioned format to guess at. The key returned is [anchorKey]'s; what cannot be read is
-     * passed through for the caller to refuse.
+     * versioned format to guess at. The key returned is [anchorKey]'s; null when the text is no
+     * key file or its key cannot be used for the origin it names.
      */
-    fun parse(text: String): Published? {
-        val obj = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return null
-        val origin = obj.string("origin")?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        val given = listOf("certificate", "key", "publicKey").firstNotNullOfOrNull { obj.string(it)?.trim()?.takeIf(String::isNotBlank) } ?: return null
-        return Published(origin, anchorKey(origin, given) ?: given)
+    fun parse(text: String): Published? = (read(text) as? Reading.Key)?.published
+
+    private fun read(text: String): Reading {
+        val obj = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return Reading.NoFields
+        val origin = obj.string("origin")?.trim()?.takeIf { it.isNotBlank() } ?: return Reading.NoFields
+        val given = listOf("certificate", "key", "publicKey").firstNotNullOfOrNull { obj.string(it)?.trim()?.takeIf(String::isNotBlank) }
+            ?: return Reading.NoFields
+        val anchored = anchored(origin, given)
+        return anchored.key?.let { Reading.Key(Published(origin, it)) } ?: Reading.Unusable(anchored.problem)
     }
 
     /**
@@ -79,16 +96,20 @@ object PublishedKeys {
      * certificate that names origins must name [origin]. The result is single-line base64, so a
      * store holds one form of a key and comparisons can be exact. Null when nothing usable is there.
      */
-    fun anchorKey(origin: String, text: String): String? {
+    fun anchorKey(origin: String, text: String): String? = anchored(origin, text).key
+
+    private fun anchored(origin: String, text: String): Anchored {
         val certificate = ChainSignature.parseCertificate(text)
         val key = if (certificate != null) {
             val names = ChainSignature.uris(certificate).filter { it.startsWith(ChainSignature.ORIGIN_URN) }
-            if (names.isNotEmpty() && ChainSignature.ORIGIN_URN + origin !in names) return null
+            if (names.isNotEmpty() && ChainSignature.ORIGIN_URN + origin !in names) {
+                return Anchored(null, "its certificate names other origins than \"$origin\"")
+            }
             certificate.publicKey.takeIf(ChainSignature::acceptableKey)
         } else {
             ChainSignature.parseSpki(text)
-        } ?: return null
-        return Base64.getEncoder().encodeToString(key.encoded)
+        } ?: return Anchored(null, "its key is not P-256 or RSA of at least 2048 bits, or is not a key at all")
+        return Anchored(Base64.getEncoder().encodeToString(key.encoded), "")
     }
 
     /**
@@ -101,7 +122,7 @@ object PublishedKeys {
         val id = origin.trim()
         if (id.isEmpty()) return "origin id can't be blank"
         if (id in reserved) return "the origin id \"$id\" is official -- a third-party origin can't claim it"
-        if (!id.matches(Regex("[a-z0-9-]+"))) {
+        if (!ORIGIN_ID.matches(id)) {
             return "origin id must be lowercase letters, digits and hyphens (it prefixes every plugin id, \"<origin>.<name>\")"
         }
         if (id.length > maxLength) return "origin id must be at most $maxLength characters"
@@ -135,14 +156,16 @@ object PublishedKeys {
                 lastProblem = "couldn't fetch $url"
                 continue
             }
-            val published = parse(bytes.toString(Charsets.UTF_8))
-            if (published == null) {
-                lastProblem = "$url has no \"origin\" and \"certificate\" fields"
-                continue
-            }
-            if (ChainSignature.parseSpki(published.keyBase64) == null) {
-                lastProblem = "the certificate $url publishes is not one that can be used for that origin"
-                continue
+            val published = when (val reading = read(bytes.toString(Charsets.UTF_8))) {
+                is Reading.Key -> reading.published
+                Reading.NoFields -> {
+                    lastProblem = "$url has no \"origin\" and \"certificate\" fields"
+                    continue
+                }
+                is Reading.Unusable -> {
+                    lastProblem = "the key $url publishes cannot be used: ${reading.problem}"
+                    continue
+                }
             }
             originProblem(published.origin, reserved, maxOriginLength)?.let {
                 return Selection.Failed("Origin \"${published.origin}\" can't be trusted: $it.")
