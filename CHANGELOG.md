@@ -6,6 +6,10 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
 ## [Unreleased]
 
 ### Added
+- `:sitecheck`: how to tell a browser check (a Cloudflare challenge, DDoS-Guard) from the page (`SiteCheck.isChallenge`),
+  which cookies are the check's clearance, when a web view has passed it, the `Clearance` model, and the `SiteSolver`
+  (the browser's own try, nobody asked) and `SiteAsker` (the person) interfaces an app plugs its web view and screens
+  into. Lifted from droidtop's `SiteChecks` (Droidtop/tracker#600) with its tests. Droidtop/tracker#751.
 - `:net` `GitHubClient(onResponse = ...)`: told of each answer's address, status and `X-RateLimit-Remaining`, for an
   app's own log (Enginehost's one line per request, Droidtop/tracker#550, #195).
 - `:launch-contract`: `EnginehostIntents` (actions, extras, reasons, the capabilities provider) and
