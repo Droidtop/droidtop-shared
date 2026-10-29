@@ -226,6 +226,27 @@ class ChainSignatureTest {
         assertNull(ChainSignature.parseSpki("not a key"))
     }
 
+    /** A key on another 256-bit curve is refused: secp256k1 has a 256-bit field too, and the contract says P-256 (Droidtop/tracker#769). */
+    @Test
+    fun `an EC key on another 256-bit curve is not accepted`() {
+        val p = java.math.BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
+        val gx = java.math.BigInteger("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16)
+        val gy = java.math.BigInteger("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16)
+        val n = java.math.BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
+        val curve = java.security.spec.EllipticCurve(java.security.spec.ECFieldFp(p), java.math.BigInteger.ZERO, java.math.BigInteger.valueOf(7))
+        val spec = java.security.spec.ECParameterSpec(curve, java.security.spec.ECPoint(gx, gy), n, 1)
+        val k1 = object : java.security.interfaces.ECPublicKey {
+            override fun getParams() = spec
+            override fun getW() = java.security.spec.ECPoint(gx, gy)
+            override fun getAlgorithm() = "EC"
+            override fun getFormat() = "X.509"
+            override fun getEncoded() = ByteArray(0)
+        }
+        assertEquals(256, k1.params.curve.field.fieldSize)
+        assertFalse("secp256k1 is not P-256", ChainSignature.acceptableKey(k1))
+        assertTrue(ChainSignature.acceptableKey(leafKey.public))
+    }
+
     /**
      * Android's provider is Conscrypt (BoringSSL), whose getExtendedKeyUsage() throws on droidtop's UUID arc;
      * found when :library-core's tests ran after a Robolectric test had installed it. Every check must hold under it.

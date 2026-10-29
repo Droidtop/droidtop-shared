@@ -9,6 +9,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
+import java.security.spec.ECFieldFp
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 import kotlinx.serialization.json.Json
@@ -307,9 +308,28 @@ object ChainSignature {
         CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(der)) as X509Certificate
     }.getOrNull()
 
+    /**
+     * The NIST P-256 (secp256r1) domain parameters, FIPS 186-4 D.1.2.3. A key is P-256 when its curve, base point and order
+     * are these; a 256-bit field is not enough (secp256k1 and brainpoolP256r1 have one too, and sign under ES256's hash).
+     */
+    private val P256_FIELD = BigInteger("FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF", 16)
+    private val P256_A = P256_FIELD - BigInteger.valueOf(3)
+    private val P256_B = BigInteger("5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B", 16)
+    private val P256_GX = BigInteger("6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296", 16)
+    private val P256_GY = BigInteger("4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5", 16)
+    private val P256_ORDER = BigInteger("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", 16)
+
+    private fun isP256(key: ECPublicKey): Boolean {
+        val params = key.params ?: return false
+        val field = params.curve.field as? ECFieldFp ?: return false
+        return field.p == P256_FIELD && params.curve.a == P256_A && params.curve.b == P256_B &&
+            params.generator.affineX == P256_GX && params.generator.affineY == P256_GY &&
+            params.order == P256_ORDER && params.cofactor == 1
+    }
+
     /** An EC P-256 or RSA (at least 2048 bits) public key, the only kinds droidtop's signatures use. */
     fun acceptableKey(key: PublicKey): Boolean = when (key) {
-        is ECPublicKey -> key.params?.curve?.field?.fieldSize == 256
+        is ECPublicKey -> isP256(key)
         is RSAPublicKey -> key.modulus.bitLength() >= MIN_RSA_BITS
         else -> false
     }
