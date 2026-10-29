@@ -6,6 +6,9 @@ All notable changes to droidtop-shared. Versions follow [Semantic Versioning](ht
 ## [Unreleased]
 
 ### Added
+- `:launch-contract`: `EnginehostIntents` (actions, extras, reasons, the capabilities provider) and
+  `EnginehostConfig` (the `enginehost.json` keys and `problems`, a shape check), every string as released builds
+  send it. Droidtop/tracker#204.
 - `:report`: `ReportDraft`/`Section`, `ReportComposer`, `Redactor` (from Enginehost's `scrub`; a folder
   name with spaces no longer leaks past the first space), and `ReportSender` with `BugzillaSender`,
   `IssueFormSender` and `EmailSender`. Droidtop/tracker#655.

@@ -14,6 +14,7 @@ dependencyResolutionManagement {
 }
 
 include(":version")
+include(":launch-contract")
 include(":net")
 include(":report")
 include(":trust")
