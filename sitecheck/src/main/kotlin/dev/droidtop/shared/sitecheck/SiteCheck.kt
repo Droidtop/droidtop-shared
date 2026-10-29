@@ -44,11 +44,16 @@ object SiteCheck {
         return n == "cf_clearance" || n.startsWith("__cf") || n.startsWith("cf_chl") || n.startsWith("__ddg")
     }
 
+    /** One `name=value` of a `Cookie` header, as written (trimmed). */
+    private class Cookie(val name: String, val text: String)
+
+    /** The cookies of a `Cookie` header ("a=1; b=2"); a piece with no `=` is not one. */
+    private fun cookies(header: String?): List<Cookie> =
+        header.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') }.map { Cookie(it.substringBefore('=').trim(), it) }
+
     /** Only the clearance cookies of a `Cookie` header ("a=1; b=2"), as a header; null when it has none. */
     fun clearanceOf(cookieHeader: String): String? =
-        cookieHeader.split(';').map { it.trim() }
-            .filter { pair -> pair.contains('=') && isClearanceCookie(pair.substringBefore('=')) }
-            .joinToString("; ").takeIf { it.isNotEmpty() }
+        cookies(cookieHeader).filter { isClearanceCookie(it.name) }.joinToString("; ") { it.text }.takeIf { it.isNotEmpty() }
 
     /**
      * [header] with [extra]'s cookies added; either may be null. A check's clearance in [extra] replaces one of the same
@@ -57,11 +62,11 @@ object SiteCheck {
      * [header] already names keeps its own value.
      */
     fun mergeCookies(header: String?, extra: String?): String? {
-        val added = extra.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') }
-        val replaced = added.map { it.substringBefore('=').trim() }.filter(::isClearanceCookie).toSet()
-        val pairs = header.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') && it.substringBefore('=').trim() !in replaced }
-        val named = pairs.map { it.substringBefore('=').trim() }.toSet()
-        return (pairs + added.filter { it.substringBefore('=').trim() !in named }).joinToString("; ").takeIf { it.isNotEmpty() }
+        val added = cookies(extra)
+        val replaced = added.map { it.name }.filter(::isClearanceCookie).toSet()
+        val kept = cookies(header).filter { it.name !in replaced }
+        val named = kept.map { it.name }.toSet()
+        return (kept + added.filter { it.name !in named }).joinToString("; ") { it.text }.takeIf { it.isNotEmpty() }
     }
 
     /** The titles a check's page has while it checks: Cloudflare's and DDoS-Guard's. */
@@ -80,7 +85,7 @@ object SiteCheck {
      */
     fun pagePassed(title: String?, cookieHeader: String?): Boolean {
         if (isCheckTitle(title)) return false
-        val names = cookieHeader.orEmpty().split(';').map { it.trim().substringBefore('=').trim() }
+        val names = cookies(cookieHeader).map { it.name }
         return "cf_clearance" in names || "__ddg2_" in names
     }
 
