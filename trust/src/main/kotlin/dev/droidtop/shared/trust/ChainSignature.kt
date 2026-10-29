@@ -23,15 +23,15 @@ import kotlinx.serialization.json.jsonObject
  * chains to droidtop's signing root", Droidtop/tracker#550): a JWS (RFC 7515) in compact
  * serialization whose protected header carries the signing certificate chain
  * as `x5c`, verified up to one trust [Anchor] and no further. For droidtop's
- * own signatures the anchor is droidtop's pinned signing root
- * ([DroidtopSigningRoot]); for an origin or catalog the person trusts it is the key
- * they confirmed. Plugin bundles, catalog indexes and revocation lists all use
+ * own signatures the anchor is the signing root the app pins (an
+ * `Anchor(pinned = true)` the app supplies, since the root key is the app's);
+ * for an origin or catalog the person trusts it is the key they confirmed. Plugin bundles, catalog indexes and revocation lists all use
  * it, told apart by [Purpose] (the header's `typ` and the leaf's extended key
  * usage), so a signature made for one can never be used for another.
  *
  * JWS rather than CMS because it verifies with nothing but the platform's
  * X.509 parser and `java.security.Signature`: Android has no public CMS
- * parser. Enginehost implements the same format.
+ * parser.
  */
 object ChainSignature {
     /** droidtop's OID arc: a UUID OID (ITU-T X.667), which needs no registration. */
